@@ -1,9 +1,12 @@
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, HttpUrl, Field
+import sqlite3
 import secrets
+from storage import init_db, add_link, get_link, increment_clicks, delete_link
+DB_PATH = "links.db"
+init_db(DB_PATH)
 import string
-links = {}
 app = FastAPI()
 CODE_LENGTH = 6
 CODE_CHARACTERS = string.ascii_letters + string.digits
@@ -14,32 +17,35 @@ class CustomLinkCreate(LinkCreate):
 @app.post("/links", status_code = 201)
 def create_link(link: LinkCreate):
     code = "".join(secrets.choice(CODE_CHARACTERS) for _ in range(CODE_LENGTH))
-    while code in links:
+    while get_link(DB_PATH, code) is not None:
         code = "".join(secrets.choice(CODE_CHARACTERS) for _ in range(CODE_LENGTH))
-    links[code] = {"url": str(link.url), "clicks": 0}
+    add_link(DB_PATH, code, str(link.url))
     return {"code": code, "short_url": f'/r/{code}'}
 @app.post("/customlinks", status_code = 201)
 def create_custom_link(link: CustomLinkCreate):
-    if link.my_code in links:
-        raise HTTPException(status_code=409)
-    links[link.my_code] = {"url": str(link.url), "clicks": 0}
+    try:
+        add_link(DB_PATH, link.my_code, str(link.url))
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="Code already exists")
     return {"code": link.my_code, "short_url": f'/r/{link.my_code}'}
 @app.get("/r/{code}", status_code = 200)
 def redirect_to_url(code: str):
-    if code not in links:
+    link = get_link(DB_PATH, code)
+    if link is None:
         raise HTTPException(status_code=404)
-    links[code]["clicks"] += 1
-    return RedirectResponse(links[code]["url"])
+    _, original_url, _, _ = link
+    increment_clicks(DB_PATH, code)
+    return RedirectResponse(original_url)
 @app.get("/links/{code}/stats", status_code = 200)
-def get_link(code: str):
-    if code not in links:
+def get_link_stats(code: str):
+    link = get_link(DB_PATH, code)
+    if link is None:
         raise HTTPException(status_code=404)
-    return {"code": code, "url": links[code]["url"], "clicks": links[code]["clicks"]}
+    code, original_url, clicks, created_at = link
+
+    return {"code": code, "url": original_url, "clicks": clicks}
 @app.delete("/links/{code}", status_code = 204)
-def delete_link(code: str):
-    if code not in links:
-        raise HTTPException(status_code=404, detail="Link not found")
-    del links[code]
+def remove_link(code: str):
+    if not delete_link(DB_PATH, code):
+        raise HTTPException(status_code=404, detail = 'Code is not found')
     return Response(status_code=204)
-
-

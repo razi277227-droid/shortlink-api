@@ -1,12 +1,14 @@
 import pytest
+import main
 from fastapi.testclient import TestClient
-from main import app, links
-@pytest.fixture(autouse=True)
-def clear_links():
-    links.clear()
-@pytest.fixture(autouse=True)
-def client():
-    return TestClient(app)
+from storage import init_db
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    test_db_path = tmp_path / "test.db"
+    init_db(str(test_db_path))
+    monkeypatch.setattr(main, "DB_PATH", test_db_path)
+    return TestClient(main.app)
+
 def test_create_link_return_201(client: TestClient):
     response = client.post("/links", json={"url": "https://google.com"})
     assert response.status_code == 201
