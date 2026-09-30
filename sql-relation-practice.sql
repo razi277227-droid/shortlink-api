@@ -117,3 +117,4 @@ LEFT JOIN visits AS v
 GROUP BY u2.id, u2.name, ls.total_links;
 SELECT u.name, COUNT(DISTINCT l.code) AS total_links, COUNT(v.id) AS total_visits FROM users AS u LEFT JOIN links AS l ON l.user_id = u.id LEFT JOIN visits AS v ON v.link_code = l.code GROUP BY u.id, u.name;
 SELECT u.name AS owner_name, COUNT(l.code) AS links_count FROM users AS u LEFT JOIN links AS l ON l.user_id = u.id GROUP BY u.name HAVING links_count = (SELECT COUNT(l2.code) FROM users AS u2 LEFT JOIN links AS l2 ON l2.user_id = u2.id GROUP BY u2.name, u2.id ORDER BY COUNT(l2.code) DESC LIMIT 1);
+SELECT l.code, MAX(visited_at) FROM links AS l LEFT JOIN visits AS v ON v.link_code = l.code GROUP BY l.code;
