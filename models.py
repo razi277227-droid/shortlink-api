@@ -1,0 +1,39 @@
+from datetime import datetime
+from sqlalchemy import BigInteger, DateTime, Text, text, Identity
+from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class Link(Base):
+    __tablename__ = "links"
+    code: Mapped[str] = mapped_column(Text, primary_key=True)
+    original_url: Mapped[str] = mapped_column(Text)
+    clicks: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(always=True),
+        primary_key=True,
+    )
+    username: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        unique=True,
+    )
+    hashed_password: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
