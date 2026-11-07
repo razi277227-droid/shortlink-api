@@ -1,16 +1,26 @@
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, HttpUrl, Field, AwareDatetime, field_validator
 from datetime import datetime, timezone
+from typing import Annotated
 import secrets
+
+
 from database import engine
-from storage_pg import add_link, get_link, increment_clicks, delete_link, create_user
-from security import hash_password
+from storage_pg import add_link, get_link, increment_clicks, delete_link, create_user, get_user_by_username, get_user_by_id
+from security import hash_password, verify_password
 from sqlalchemy.exc import IntegrityError
 import string
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from auth import create_access_token, decode_access_token
+import jwt
+
 app = FastAPI()
 CODE_LENGTH = 6
 CODE_CHARACTERS = string.ascii_letters + string.digits
+DUMMY_HASH = hash_password('dummy-password-for-timing')
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 class LinkCreate(BaseModel):
@@ -44,6 +54,25 @@ class UserRead(BaseModel):
     username: str
     created_at: datetime
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> dict:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = decode_access_token(token)
+        user_id = int(payload["sub"])
+    except (jwt.InvalidTokenError, ValueError):
+        raise credentials_exception
+    user = get_user_by_id(engine, user_id)
+    if user is None:
+        raise credentials_exception
+    return user
 
 @app.post("/links", status_code = 201)
 def create_link(link: LinkCreate):
@@ -97,3 +126,23 @@ def register_user(user: UserCreate):
             raise HTTPException(status_code=409, detail="Username already exists")
         raise
     return created_user
+@app.post("/auth/token", response_model=Token)
+def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    user = get_user_by_username(engine, form_data.username)
+    if user is None:
+        verify_password(form_data.password, DUMMY_HASH)
+        password_ok = False
+    else:
+        password_ok = verify_password(form_data.password, user["hashed_password"])
+    if not password_ok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail = "Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = create_access_token(user["id"])
+    return Token(access_token=token, token_type="bearer")
+@app.get("/users/me", response_model=UserRead)
+def read_current_user(current_user: Annotated[dict, Depends(get_current_user)]):
+    return current_user

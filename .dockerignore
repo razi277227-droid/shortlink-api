@@ -10,3 +10,4 @@ backups/
 .idea/
 *.db
 .DS_Store
+certs/

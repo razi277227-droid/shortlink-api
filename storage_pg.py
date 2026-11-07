@@ -57,3 +57,18 @@ def get_user_by_username(engine, username):
         if row is None:
             return None
         return dict(row)
+
+def get_user_by_id(engine, user_id):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("""
+            SELECT id, username, created_at
+            FROM users 
+            WHERE id = :user_id
+            """),
+            {"user_id": user_id}
+        )
+        row = result.mappings().one_or_none()
+        if row is None:
+            return None
+        return dict(row)
