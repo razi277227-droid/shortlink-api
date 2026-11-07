@@ -7,23 +7,6 @@ from security import verify_password
 from storage_pg import get_user_by_username
 
 
-@pytest.fixture
-def client(monkeypatch):
-    test_engine = create_engine("postgresql+psycopg:///shortlink_app_test")
-    try:
-        with test_engine.begin() as conn:
-            database_name = conn.execute(text("SELECT current_database()")).scalar_one()
-            if database_name != "shortlink_app_test":
-                raise RuntimeError(f"Excepted test database, but got {database_name}")
-            conn.execute(text("DELETE FROM links"))
-            conn.execute(text("DELETE FROM users"))
-        monkeypatch.setattr(main, "engine", test_engine)
-        with TestClient(main.app) as test_client:
-            yield test_client
-    finally:
-        test_engine.dispose()
-
-
 def test_create_link_return_201(client: TestClient):
     response = client.post("/links", json={"url": "https://google.com"})
     assert response.status_code == 201
