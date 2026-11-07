@@ -18,6 +18,11 @@ services:
     image: banana:latest
     environment:
       DATABASE_URL: "postgresql+psycopg://shortlink:${POSTGRES_PASSWORD}@db:5432/shortlink_app_dev"
+      JWT_PRIVATE_KEY_PATH: /run/secrets/jwt_private_key
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt_public_key
+    secrets:
+      - jwt_private_key
+      - jwt_public_key
     ports:
       - "127.0.0.1:8001:8000"
     depends_on:
@@ -34,4 +39,9 @@ services:
 volumes:
   postgres_data:
 
+secrets:
+  jwt_private_key:
+    file: ./certs/jwt-private.pem
+  jwt_public_key:
+    file: ./certs/jwt-public.pem
 
