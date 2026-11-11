@@ -1,29 +1,32 @@
 from sqlalchemy import text
-def add_link(engine, code, original_url, expires_at=None):
+def add_link(engine, code, original_url, owner_id, expires_at=None):
     with engine.begin() as conn:
         conn.execute(
             text("""
-                INSERT INTO links (code, original_url, expires_at)
-                VALUES (:code, :original_url, :expires_at)
+                INSERT INTO links (code, original_url, owner_id, expires_at)
+                VALUES (:code, :original_url, :owner_id, :expires_at)
             """),
             {
                 "code": code,
                 "original_url": original_url,
+                "owner_id": owner_id,
                 "expires_at": expires_at,
             },
         )
 def get_link(engine, code):
     with engine.connect() as conn:
-        result = conn.execute(text("SELECT code, original_url, clicks, created_at, expires_at FROM links WHERE code = :code"), {"code": code})
-        row = result.one_or_none()
-    return row
+        result = conn.execute(text("SELECT code, original_url, owner_id, clicks, created_at, expires_at FROM links WHERE code = :code"), {"code": code})
+        row = result.mappings().one_or_none()
+    if row is None:
+        return None
+    return dict(row)
 def increment_clicks(engine, code):
     with engine.begin() as conn:
         result = conn.execute(text("UPDATE links SET clicks = clicks + 1 WHERE code = :code"), {"code": code})
     return result.rowcount == 1
-def delete_link(engine, code):
+def delete_link(engine, code, owner_id):
     with engine.begin() as conn:
-        result = conn.execute(text("DELETE FROM links WHERE code = :code"), {"code": code})
+        result = conn.execute(text("DELETE FROM links WHERE code = :code AND owner_id = :owner_id"), {"code": code, "owner_id": owner_id})
     return result.rowcount == 1
 
 
