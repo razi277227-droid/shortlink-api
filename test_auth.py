@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 import pytest
 from sqlalchemy import text
+from helpers import register, login, bearer
 
 import auth
 import main
@@ -10,21 +11,6 @@ import main
 LOGIN_ERROR = {"detail": "Incorrect username or password"}
 TOKEN_ERROR = {"detail": "Could not validate credentials"}
 
-
-def register(client, username, password):
-    response = client.post("/users", json={"username": username, "password": password})
-    assert response.status_code == 201
-    return response.json()
-
-
-def login(client, username, password):
-    response = client.post("/auth/token", data={"username": username, "password": password})
-    assert response.status_code == 200
-    return response.json()["access_token"]
-
-
-def bearer(token):
-    return {"Authorization": f"Bearer {token}"}
 
 
 def make_payload(sub, **overrides):

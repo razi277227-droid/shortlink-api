@@ -7,80 +7,80 @@ from security import verify_password
 from storage_pg import get_user_by_username
 
 
-def test_create_link_return_201(client: TestClient):
-    response = client.post("/links", json={"url": "https://google.com"})
+def test_create_link_return_201(auth_client: TestClient):
+    response = auth_client.post("/links", json={"url": "https://google.com"})
     assert response.status_code == 201
     assert response.json()["short_url"].startswith("/r/")
 
 
-def test_invalid_url_return_422(client: TestClient):
-    response = client.post("/links", json={"url": "not fucking url"})
+def test_invalid_url_return_422(auth_client: TestClient):
+    response = auth_client.post("/links", json={"url": "not a url"})
     assert response.status_code == 422
 
 
-def test_unknown_code_return_404(client: TestClient):
-    response = client.get("/links/unknown/stats")
+def test_unknown_code_return_404(auth_client: TestClient):
+    response = auth_client.get("/links/unknown/stats")
     assert response.status_code == 404
 
 
-def test_redirect_has_correct_location(client: TestClient):
-    create_response = client.post("/links", json={"url": "https://google.com"})
+def test_redirect_has_correct_location(auth_client: TestClient):
+    create_response = auth_client.post("/links", json={"url": "https://google.com"})
     code = create_response.json()["code"]
-    response = client.get(f"/r/{code}", follow_redirects=False)
+    response = auth_client.get(f"/r/{code}", follow_redirects=False)
     assert response.status_code == 307
     assert response.headers["Location"] == "https://google.com/"
 
 
-def test_clicks_raises(client: TestClient):
-    create_response = client.post("/links", json={"url": "https://google.com"})
+def test_clicks_raises(auth_client: TestClient):
+    create_response = auth_client.post("/links", json={"url": "https://google.com"})
     code = create_response.json()["code"]
-    client.get(f"/r/{code}", follow_redirects=False)
-    counter = client.get(f"/links/{code}/stats").json()["clicks"]
+    auth_client.get(f"/r/{code}", follow_redirects=False)
+    counter = auth_client.get(f"/links/{code}/stats").json()["clicks"]
     assert counter == 1
 
 
-def test_custom_links(client: TestClient):
-    response = client.post("/customlinks", json={"url": "https://google.com", "my_code": "pidor"})
+def test_custom_links(auth_client: TestClient):
+    response = auth_client.post("/customlinks", json={"url": "https://google.com", "my_code": "mycode"})
     assert response.status_code == 201
 
 
-def test_custom_links_low(client: TestClient):
-    response = client.post("/customlinks", json={"url": "https://google.com", "my_code": "pi"})
+def test_custom_links_low(auth_client: TestClient):
+    response = auth_client.post("/customlinks", json={"url": "https://google.com", "my_code": "pi"})
     assert response.status_code == 422
 
 
-def test_custom_links_large(client: TestClient):
-    response = client.post("/customlinks", json={"url": "https://google.com", "my_code": "qwertyuiopasdfghjklzxcvbnm"})
+def test_custom_links_large(auth_client: TestClient):
+    response = auth_client.post("/customlinks", json={"url": "https://google.com", "my_code": "qwertyuiopasdfghjklzxcvbnm"})
     assert response.status_code == 422
 
 
-def test_link_delete(client: TestClient):
-    response = client.post("/links", json={"url": "https://google.com"})
+def test_link_delete(auth_client: TestClient):
+    response = auth_client.post("/links", json={"url": "https://google.com"})
     code = response.json()["code"]
-    del_response = client.delete(f"/links/{code}")
+    del_response = auth_client.delete(f"/links/{code}")
     assert del_response.status_code == 204
-    status_response = client.get(f"/links/{code}/stats")
+    status_response = auth_client.get(f"/links/{code}/stats")
     assert status_response.status_code == 404
 
 
-def test_custom_link_banned_symbols1(client: TestClient):
-    response = client.post("/customlinks", json={"url": "https://google.com", "my_code": "!!abc"})
+def test_custom_link_banned_symbols1(auth_client: TestClient):
+    response = auth_client.post("/customlinks", json={"url": "https://google.com", "my_code": "!!abc"})
     assert response.status_code == 422
 
 
-def test_custom_link_banned_symbols2(client: TestClient):
-    response = client.post("/customlinks", json={"url": "https://google.com", "my_code": " abc"})
+def test_custom_link_banned_symbols2(auth_client: TestClient):
+    response = auth_client.post("/customlinks", json={"url": "https://google.com", "my_code": " abc"})
     assert response.status_code == 422
 
 
-def test_custom_link_banned_symbols3(client: TestClient):
-    response = client.post("/customlinks", json={"url": "https://google.com", "my_code": "abc "})
+def test_custom_link_banned_symbols3(auth_client: TestClient):
+    response = auth_client.post("/customlinks", json={"url": "https://google.com", "my_code": "abc "})
     assert response.status_code == 422
 
 
-def test_custom_link_povtory(client: TestClient):
-    response1 = client.post("/customlinks", json={"url": "https://google.com", "my_code": "abc"})
-    response2 = client.post("/customlinks", json={"url": "https://yandex.com", "my_code": "abc"})
+def test_custom_link_povtory(auth_client: TestClient):
+    response1 = auth_client.post("/customlinks", json={"url": "https://google.com", "my_code": "abc"})
+    response2 = auth_client.post("/customlinks", json={"url": "https://yandex.com", "my_code": "abc"})
     assert response2.status_code == 409
 
 
@@ -92,15 +92,15 @@ def fixed_now(monkeypatch):
 
 
 @pytest.mark.parametrize("extra_fields", [{}, {"expires_at": None}])
-def test_link_without_expiration(client, monkeypatch, fixed_now, extra_fields):
-    response = client.post("/links", json={"url": "https://google.com", **extra_fields})
+def test_link_without_expiration(auth_client, monkeypatch, fixed_now, extra_fields):
+    response = auth_client.post("/links", json={"url": "https://google.com", **extra_fields})
     assert response.status_code == 201
     code = response.json()["code"]
     later = fixed_now + timedelta(seconds=1)
     monkeypatch.setattr(main, "utc_now", lambda: later)
-    response = client.get(f"/r/{code}", follow_redirects=False)
+    response = auth_client.get(f"/r/{code}", follow_redirects=False)
     assert response.status_code == 307
-    response = client.get(f"/links/{code}/stats")
+    response = auth_client.get(f"/links/{code}/stats")
     assert response.status_code == 200
     stats = response.json()
     assert stats["expires_at"] is None
@@ -111,17 +111,17 @@ def test_link_without_expiration(client, monkeypatch, fixed_now, extra_fields):
 @pytest.mark.parametrize("endpoint, extra_fields", [("/links", {}), ("/customlinks", {"my_code": "invalid_time"}), ])
 @pytest.mark.parametrize("expires_at", ["2030-01-01T11:00:00+00:00", "2030-01-01T12:00:00+00:00", "2030-01-01T13:00:00",
                                         "not-a-date", ])
-def test_invalid_expiration(client, fixed_now, endpoint, extra_fields, expires_at):
-    response = client.post(endpoint, json={"url": "https://google.com", "expires_at": expires_at, **extra_fields})
+def test_invalid_expiration(auth_client, fixed_now, endpoint, extra_fields, expires_at):
+    response = auth_client.post(endpoint, json={"url": "https://google.com", "expires_at": expires_at, **extra_fields})
     assert response.status_code == 422
 
 
 @pytest.mark.parametrize("endpoint, extra_fields", [("/links", {}), ("/customlinks", {"my_code": "timed-link"}), ])
 @pytest.mark.parametrize("hours_later", [1, 2])
-def test_link_expiration(client, fixed_now, endpoint, hours_later, extra_fields, monkeypatch):
+def test_link_expiration(auth_client, fixed_now, endpoint, hours_later, extra_fields, monkeypatch):
     expires_at = fixed_now + timedelta(hours=1)
     plus_three = timezone(timedelta(hours=3))
-    response = client.post(
+    response = auth_client.post(
         endpoint,
         json={
             "url": "https://google.com",
@@ -132,29 +132,29 @@ def test_link_expiration(client, fixed_now, endpoint, hours_later, extra_fields,
     assert response.status_code == 201
     code = response.json()["code"]
 
-    response = client.get(f"/links/{code}/stats")
+    response = auth_client.get(f"/links/{code}/stats")
     assert response.status_code == 200
     stats = response.json()
     assert datetime.fromisoformat(stats["expires_at"]) == expires_at
     assert stats["expired"] is False
     assert stats["clicks"] == 0
 
-    response = client.get(f"/r/{code}", follow_redirects=False)
+    response = auth_client.get(f"/r/{code}", follow_redirects=False)
     assert response.status_code == 307
     assert response.headers["Location"] == "https://google.com/"
 
-    response = client.get(f"/links/{code}/stats")
+    response = auth_client.get(f"/links/{code}/stats")
     assert response.status_code == 200
     assert response.json()["clicks"] == 1
 
     later = fixed_now + timedelta(hours=hours_later)
     monkeypatch.setattr(main, "utc_now", lambda: later)
 
-    response = client.get(f"/r/{code}", follow_redirects=False)
+    response = auth_client.get(f"/r/{code}", follow_redirects=False)
     assert response.status_code == 410
     assert response.json()["detail"] == "Link has expired"
 
-    response = client.get(f"/links/{code}/stats")
+    response = auth_client.get(f"/links/{code}/stats")
     assert response.status_code == 200
     stats = response.json()
     assert stats["expired"] is True
@@ -162,7 +162,7 @@ def test_link_expiration(client, fixed_now, endpoint, hours_later, extra_fields,
     assert datetime.fromisoformat(stats["expires_at"]) == expires_at
 
     # повтороное чтение статистики тоже не увеличивает счетчик
-    response = client.get(f"/links/{code}/stats")
+    response = auth_client.get(f"/links/{code}/stats")
     assert response.status_code == 200
     assert response.json()["clicks"] == 1
 

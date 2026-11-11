@@ -3,6 +3,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
+from helpers import register, login
 
 import auth
 import main
@@ -51,3 +52,10 @@ def client(monkeypatch, rsa_keys):
             yield test_client
     finally:
         test_engine.dispose()
+
+@pytest.fixture
+def auth_client(client):
+    register(client, "owner", "owner-pass")
+    token = login(client, "owner", "owner-pass")
+    client.headers["Authorization"] = f"Bearer {token}"
+    return client
