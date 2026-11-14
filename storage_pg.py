@@ -75,3 +75,26 @@ def get_user_by_id(engine, user_id):
         if row is None:
             return None
         return dict(row)
+
+def list_links_by_owner(engine, owner_id, limit, offset):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("""
+                 SELECT code, original_url, owner_id, clicks, created_at, expires_at
+                 FROM links WHERE owner_id = :owner_id
+                 ORDER BY created_at DESC, code DESC LIMIT :limit OFFSET :offset
+                 """),
+                {"owner_id": owner_id, "limit": limit, "offset": offset}
+        )
+        rows = result.mappings().all()
+        return [dict(row) for row in rows]
+
+def count_links_by_owner(engine, owner_id):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("""
+            SELECT COUNT(*) FROM links WHERE owner_id = :owner_id
+            """),
+            {"owner_id": owner_id}
+        )
+        return result.scalar_one()

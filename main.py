@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Response, Depends, HTTPException, status
+from fastapi import FastAPI, Response, Depends, HTTPException, status, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, HttpUrl, Field, AwareDatetime, field_validator
 from datetime import datetime, timezone
@@ -7,7 +7,7 @@ import secrets
 
 from database import engine
 from storage_pg import add_link, get_link, increment_clicks, delete_link, create_user, get_user_by_username, \
-    get_user_by_id
+    get_user_by_id, list_links_by_owner, count_links_by_owner
 from security import hash_password, verify_password
 from sqlalchemy.exc import IntegrityError
 import string
@@ -25,6 +25,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
+def is_expired(expires_at: datetime | None) -> bool:
+    if expires_at is None:
+        return False
+    return expires_at <= utc_now()
 
 class LinkCreate(BaseModel):
     url: HttpUrl
@@ -65,6 +69,21 @@ class UserRead(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class LinkItem(BaseModel):
+    code: str
+    short_url: str
+    url: str
+    clicks: int
+    created_at: datetime
+    expires_at: datetime | None
+    expired: bool
+
+class LinkPage(BaseModel):
+    items: list[LinkItem]
+    total: int
+    limit: int
+    offset: int
 
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> dict:
@@ -107,7 +126,7 @@ def redirect_to_url(code: str):
     link = get_link(engine, code)
     if link is None:
         raise HTTPException(status_code=404)
-    if link["expires_at"] is not None and link["expires_at"] <= utc_now():
+    if is_expired(link["expires_at"]):
         raise HTTPException(status_code=410, detail="Link has expired")
     increment_clicks(engine, code)
     return RedirectResponse(link["original_url"])
@@ -118,9 +137,33 @@ def get_link_stats(code: str, current_user: dict = Depends(get_current_user)):
     link = get_link(engine, code)
     if link is None or current_user["id"] != link["owner_id"]:
         raise HTTPException(status_code=404)
-    expired = link["expires_at"] is not None and link["expires_at"] <= utc_now()
+    expired = is_expired(link["expires_at"])
     return {"code": code, "url": link["original_url"], "clicks": link["clicks"], "expires_at": link["expires_at"],
             "expired": expired}
+
+@app.get("/links", response_model=LinkPage)
+def get_list_my_links(current_user: dict = Depends(get_current_user),
+                      limit: Annotated[int, Query(ge=1, le=100)] = 20,
+                      offset: Annotated[int, Query(ge=0)] = 0,
+):
+    links = list_links_by_owner(engine, current_user["id"], limit, offset)
+    total = count_links_by_owner(engine, current_user["id"])
+
+    items = []
+    for link in links:
+        item = LinkItem(
+            code=link["code"],
+            short_url=f'/r/{link["code"]}',
+            url=link["original_url"],
+            clicks=link["clicks"],
+            created_at=link["created_at"],
+            expires_at=link["expires_at"],
+            expired=is_expired(link["expires_at"]),
+        )
+        items.append(item)
+    return LinkPage(items=items, total=total, limit=limit, offset=offset)
+
+
 
 
 @app.delete("/links/{code}", status_code=204)
