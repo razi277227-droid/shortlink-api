@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import BigInteger, DateTime, Text, text, Identity
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, Index
 
 class Base(DeclarativeBase):
     pass
@@ -11,7 +11,7 @@ class Link(Base):
     __tablename__ = "links"
     owner_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="CASCADE"),
-        nullable= True, index=True)
+        nullable= True)
 
     code: Mapped[str] = mapped_column(Text, primary_key=True)
     original_url: Mapped[str] = mapped_column(Text)
@@ -19,6 +19,12 @@ class Link(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+Index(
+    "ix_links_owner_created_code",
+    Link.owner_id,
+    Link.created_at.desc(),
+    Link.code.desc(),
+)
 
 class User(Base):
     __tablename__ = "users"
