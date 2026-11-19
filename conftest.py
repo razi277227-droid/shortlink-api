@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from helpers import register, login
 
+import os
 import auth
 import main
 
@@ -37,8 +38,8 @@ def client(monkeypatch, rsa_keys):
     private_pem, public_pem = rsa_keys
     monkeypatch.setattr(auth, "load_private_key", lambda: private_pem)
     monkeypatch.setattr(auth, "load_public_key", lambda: public_pem)
-
-    test_engine = create_engine("postgresql+psycopg:///shortlink_app_test")
+    test_database_url = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg:///shortlink_app_test")
+    test_engine = create_engine(test_database_url)
     try:
         with test_engine.begin() as conn:
             database_name = conn.execute(text("SELECT current_database()")).scalar_one()
