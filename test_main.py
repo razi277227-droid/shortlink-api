@@ -9,7 +9,7 @@ from storage_pg import get_user_by_username
 
 def test_create_link_return_201(auth_client: TestClient):
     response = auth_client.post("/links", json={"url": "https://google.com"})
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json()["short_url"].startswith("/r/")
 
 
