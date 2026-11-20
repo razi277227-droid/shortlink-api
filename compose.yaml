@@ -15,7 +15,7 @@ services:
       start_period: 10s
   api:
     build: .
-    image: banana:latest
+    image: shortlink-api
     environment:
       DATABASE_URL: "postgresql+psycopg://shortlink:${POSTGRES_PASSWORD}@db:5432/shortlink_app_dev"
       JWT_PRIVATE_KEY_PATH: /run/secrets/jwt_private_key
