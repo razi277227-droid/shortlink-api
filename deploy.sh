@@ -14,5 +14,5 @@ docker pull "$SHORTLINK_IMAGE"
 docker compose -f compose.yaml -f compose.prod.yaml run --rm -T --no-deps --pull never api alembic upgrade head
 docker compose -f compose.yaml -f compose.prod.yaml up -d --no-deps --no-build --pull never api
 
-curl -fsS --retry 10 --retry-connrefused --retry-delay 1 --max-time 5 -o /dev/null http://127.0.0.1:8001/openapi.json
+curl -fsS --retry 10 --retry-all-errors --retry-delay 1 --max-time 5 -o /dev/null http://127.0.0.1:8001/openapi.json
 docker inspect -f '{{.Config.Image}}' shortlink-api-api-1
